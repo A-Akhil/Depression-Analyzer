@@ -3,6 +3,7 @@ import ollama
 from typing import List
 from dataclasses import dataclass
 import logging
+import json
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -34,6 +35,7 @@ def assess_depression():
     }
 
     for response in responses:
+        # Updated system prompt with JSON schema
         system_prompt = f"""You are an AI model specializing in student mental health assessment. Your task is to assess potential signs of depression based on the student's response to a given question.
 
         Here’s the question for your assessment:
@@ -42,11 +44,21 @@ def assess_depression():
 
         Your Task:
         - Rate the response on a scale of 1 to 10 for signs of depression:
-        - 1-2: No signs of depression.
-        - 3-4: Mild signs of depression.
-        - 5-6: Moderate signs of depression.
-        - 7-8: Noticeable signs of depression.
-        - 9-10: Significant signs of depression.
+          - 1-2: No signs of depression.
+          - 3-4: Mild signs of depression.
+          - 5-6: Moderate signs of depression.
+          - 7-8: Noticeable signs of depression.
+          - 9-10: Significant signs of depression.
+
+        If you are unsure or the response is unclear, still provide a depression score in the range of 1 to 10. If the response is not related to depression, assign a neutral score of 5. 
+
+        Your response should be in the following JSON format:
+        {{
+          "depression_score": <number between 1 and 10>, 
+          "notes": "<any notes or explanation you may have>"
+        }}
+
+        Please ensure the response contains both a "depression_score" and "notes" key, even if the assessment is uncertain.
         """
 
         ollama_response = ollama.chat(model='llama3.2', messages=[
@@ -54,27 +66,32 @@ def assess_depression():
             {"role": "user", "content": response.student_response}
         ])
 
-        logging.info(f"Question: {response.question_text}")
-        logging.info(f"Student response: {response.student_response}")
-        logging.info(f"Ollama response: {ollama_response}")
+        # Display the question and Ollama's response directly in the terminal
+        print(f"Question: {response.question_text}")
+        print(f"Ollama response: {ollama_response['message']['content']}")
 
         try:
-            depression_text = ollama_response['message']['content']
-            import re
-            numbers = re.findall(r'\d+', depression_text)
-            depression_scale = numbers[0] if numbers else '5'
-        except (KeyError, IndexError, ValueError) as e:
-            logging.error(f"Error parsing Ollama response: {e}")
-            depression_scale = '5'
+            depression_data = ollama_response['message']['content']
+            # Expecting the response to be a JSON string in the form of:
+            # {"depression_score": <score>, "notes": <any explanation>}
+            depression_info = json.loads(depression_data)
+
+            depression_score = depression_info.get('depression_score', 5)
+            notes = depression_info.get('notes', 'No specific notes')
+        except (KeyError, IndexError, ValueError, json.JSONDecodeError) as e:
+            print(f"Error parsing Ollama response: {e}")
+            depression_score = 5  # Default score if there's an issue
+            notes = "Error in assessment"
 
         result["responses"].append({
             "question_number": response.question_number,
             "question_text": response.question_text,
             "student_response": response.student_response,
-            "depression_scale": float(depression_scale)
+            "depression_score": float(depression_score),
+            "notes": notes
         })
 
-        overall_depression += float(depression_scale)
+        overall_depression += float(depression_score)
 
     total_questions = len(responses)
     overall_depression_scale = overall_depression / total_questions if total_questions > 0 else 0

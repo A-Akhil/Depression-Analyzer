@@ -137,17 +137,18 @@ if all_answered:
                 with col1:
                     st.write("**Emotional Health Indicators**")
                     for resp in result["responses"][:len(questions['emotional'])]:
-                        st.write(f"- Question {resp['question_number']}: {resp['depression_scale']}/10")
+                        st.write(f"- Question {resp['question_number']}: {resp['depression_score']}/10")
                         
                 with col2:
                     st.write("**Academic Performance Indicators**")
                     for resp in result["responses"][len(questions['emotional']):len(questions['emotional'])+len(questions['academic'])]:
-                        st.write(f"- Question {resp['question_number']}: {resp['depression_scale']}/10")
+                        st.write(f"- Question {resp['question_number']}: {resp['depression_score']}/10")
                         
                 with col3:
                     st.write("**Social Integration Indicators**")
                     for resp in result["responses"][len(questions['emotional'])+len(questions['academic']):]:
-                        st.write(f"- Question {resp['question_number']}: {resp['depression_scale']}/10")
+                        st.write(f"- Question {resp['question_number']}: {resp['depression_score']}/10")
+
             else:
                 st.error("Error: Unable to process your responses. Please try again later.")
 else:
