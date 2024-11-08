@@ -2,49 +2,80 @@ import streamlit as st
 import requests
 import json
 from typing import List
-from pydantic import BaseModel
 
-st.set_page_config(page_title="Student Depression Assessment", layout="wide")
+st.set_page_config(page_title="Depression Assessment", layout="wide")
+
+# Sidebar user type selection
+st.sidebar.header("User Type")
+user_type = st.sidebar.radio("Select User Type:", ["Student", "Faculty"])
 
 # Sidebar progress tracking
 def calculate_progress(responses, total_questions):
     answered = sum(1 for resp in responses if resp["student_response"].strip() != "")
     return (answered / total_questions) * 100
 
-# Categories of questions
-emotional_questions = [
-    "How often do you feel overwhelmed by academic pressure?",
-    "How frequently do you experience difficulty sleeping?",
-    "How often do you feel lonely or isolated at school?",
-    "How would you rate your ability to concentrate in class?",
-    "How often do you feel hopeless about your academic future?"
-]
+# Define questions for Student
+student_questions = {
+    "emotional": [
+        "How often do you feel overwhelmed by academic pressure?",
+        "How frequently do you experience difficulty sleeping?",
+        "How often do you feel lonely or isolated at school?",
+        "How would you rate your ability to concentrate in class?",
+        "How often do you feel hopeless about your academic future?"
+    ],
+    "academic": [
+        "How satisfied are you with your current academic performance?",
+        "How well can you keep up with assignment deadlines?",
+        "How often do you participate in class discussions?",
+        "How comfortable are you asking teachers for help?",
+        "How well can you maintain your study schedule?"
+    ],
+    "social": [
+        "How often do you engage in extracurricular activities?",
+        "How comfortable are you working in group projects?",
+        "How strong is your support system at school?",
+        "How often do you interact with classmates outside of class?",
+        "How well do you handle academic competition?"
+    ]
+}
 
-academic_questions = [
-    "How satisfied are you with your current academic performance?",
-    "How well can you keep up with assignment deadlines?",
-    "How often do you participate in class discussions?",
-    "How comfortable are you asking teachers for help?",
-    "How well can you maintain your study schedule?"
-]
+# Define questions for Faculty
+faculty_questions = {
+    "emotional": [
+        "How often do you feel overwhelmed by your workload?",
+        "How frequently do you experience burnout symptoms?",
+        "How often do you feel unsupported by your peers or administration?",
+        "How would you rate your job satisfaction?",
+        "How often do you feel stressed about your teaching performance?"
+    ],
+    "academic": [
+        "How satisfied are you with your students' academic progress?",
+        "How well do you manage your class schedules?",
+        "How often do you engage in professional development activities?",
+        "How comfortable are you with current teaching methods?",
+        "How well do you balance teaching and research responsibilities?"
+    ],
+    "social": [
+        "How often do you participate in faculty meetings?",
+        "How comfortable are you collaborating with other faculty members?",
+        "How strong is your support system at work?",
+        "How often do you engage in social activities with colleagues?",
+        "How well do you handle administrative pressures?"
+    ]
+}
 
-social_questions = [
-    "How often do you engage in extracurricular activities?",
-    "How comfortable are you working in group projects?",
-    "How strong is your support system at school?",
-    "How often do you interact with classmates outside of class?",
-    "How well do you handle academic competition?"
-]
+# Select questions based on user type
+questions = student_questions if user_type == "Student" else faculty_questions
 
 # Initialize responses list
 responses = []
 
 # Streamlit app
-st.title("🎓 Student Depression Assessment")
-st.write("This assessment helps identify potential signs of depression among students.")
+st.title("🧠 Depression Assessment")
+st.write(f"This assessment helps identify potential signs of depression among {user_type.lower()}s.")
 
 # Sidebar progress
-total_questions = len(emotional_questions) + len(academic_questions) + len(social_questions)
+total_questions = sum(len(q_list) for q_list in questions.values())
 progress = calculate_progress(responses, total_questions)
 st.sidebar.header("📝 Assessment Progress")
 progress_bar = st.sidebar.progress(progress / 100)
@@ -52,26 +83,17 @@ progress_bar = st.sidebar.progress(progress / 100)
 # Create tabs for different categories
 tab1, tab2, tab3 = st.tabs(["Emotional Health", "Academic Performance", "Social Integration"])
 
-with tab1:
-    st.header("Emotional Health Assessment")
-    for i, question in enumerate(emotional_questions):
-        st.write(f"**{i + 1}. {question}**")
-        response = st.text_area(f"Your response (Question {i + 1}):", key=f"emotional_{i}")
-        responses.append({"question_number": i + 1, "question_text": question, "student_response": response})
-
-with tab2:
-    st.header("Academic Performance Assessment")
-    for i, question in enumerate(academic_questions):
-        st.write(f"**{i + 1}. {question}**")
-        response = st.text_area(f"Your response (Question {i + 1}):", key=f"academic_{i}")
-        responses.append({"question_number": i + len(emotional_questions), "question_text": question, "student_response": response})
-
-with tab3:
-    st.header("Social Integration Assessment")
-    for i, question in enumerate(social_questions):
-        st.write(f"**{i + 1}. {question}**")
-        response = st.text_area(f"Your response (Question {i + 1}):", key=f"social_{i}")
-        responses.append({"question_number": i + len(emotional_questions) + len(academic_questions), "question_text": question, "student_response": response})
+for tab, category in zip([tab1, tab2, tab3], ["emotional", "academic", "social"]):
+    with tab:
+        st.header(f"{category.capitalize()} Assessment")
+        for i, question in enumerate(questions[category]):
+            st.write(f"**{i + 1}. {question}**")
+            response = st.text_area(f"Your response (Question {i + 1}):", key=f"{category}_{i}")
+            responses.append({
+                "question_number": i + 1,
+                "question_text": question,
+                "student_response": response
+            })
 
 # Update progress bar after all responses
 progress = calculate_progress(responses, total_questions)
@@ -83,7 +105,11 @@ if all_answered:
     if st.button("Submit Assessment"):
         with st.spinner('Analyzing your responses, please wait...'):
             backend_url = "http://localhost:5000/assess_depression"
-            response = requests.post(backend_url, json=responses)
+            payload = {
+                "user_type": user_type,
+                "responses": responses
+            }
+            response = requests.post(backend_url, json=payload)
 
             if response.status_code == 200:
                 result = response.json()
@@ -110,17 +136,17 @@ if all_answered:
                 
                 with col1:
                     st.write("**Emotional Health Indicators**")
-                    for resp in result["responses"][:len(emotional_questions)]:
+                    for resp in result["responses"][:len(questions['emotional'])]:
                         st.write(f"- Question {resp['question_number']}: {resp['depression_scale']}/10")
                         
                 with col2:
                     st.write("**Academic Performance Indicators**")
-                    for resp in result["responses"][len(emotional_questions):len(emotional_questions)+len(academic_questions)]:
+                    for resp in result["responses"][len(questions['emotional']):len(questions['emotional'])+len(questions['academic'])]:
                         st.write(f"- Question {resp['question_number']}: {resp['depression_scale']}/10")
                         
                 with col3:
                     st.write("**Social Integration Indicators**")
-                    for resp in result["responses"][len(emotional_questions)+len(academic_questions):]:
+                    for resp in result["responses"][len(questions['emotional'])+len(questions['academic']):]:
                         st.write(f"- Question {resp['question_number']}: {resp['depression_scale']}/10")
             else:
                 st.error("Error: Unable to process your responses. Please try again later.")
