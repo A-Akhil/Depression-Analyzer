@@ -1,4 +1,3 @@
-# Streamlit Frontend (app.py)
 import streamlit as st
 import requests
 import json
@@ -6,6 +5,11 @@ from typing import List
 from pydantic import BaseModel
 
 st.set_page_config(page_title="Student Depression Assessment", layout="wide")
+
+# Sidebar progress tracking
+def calculate_progress(responses, total_questions):
+    answered = sum(1 for resp in responses if resp["student_response"].strip() != "")
+    return (answered / total_questions) * 100
 
 # Categories of questions
 emotional_questions = [
@@ -32,77 +36,93 @@ social_questions = [
     "How well do you handle academic competition?"
 ]
 
+# Initialize responses list
+responses = []
+
 # Streamlit app
 st.title("🎓 Student Depression Assessment")
 st.write("This assessment helps identify potential signs of depression among students.")
 
+# Sidebar progress
+total_questions = len(emotional_questions) + len(academic_questions) + len(social_questions)
+progress = calculate_progress(responses, total_questions)
+st.sidebar.header("📝 Assessment Progress")
+progress_bar = st.sidebar.progress(progress / 100)
+
 # Create tabs for different categories
 tab1, tab2, tab3 = st.tabs(["Emotional Health", "Academic Performance", "Social Integration"])
-
-responses = []
 
 with tab1:
     st.header("Emotional Health Assessment")
     for i, question in enumerate(emotional_questions):
-        st.write(f"{i+1}. {question}")
-        response = st.text_area(f"Your response (Question {i+1}):", key=f"emotional_{i}")
-        responses.append({"question_number": i+1, "question_text": question, "student_response": response})
+        st.write(f"**{i + 1}. {question}**")
+        response = st.text_area(f"Your response (Question {i + 1}):", key=f"emotional_{i}")
+        responses.append({"question_number": i + 1, "question_text": question, "student_response": response})
 
 with tab2:
     st.header("Academic Performance Assessment")
     for i, question in enumerate(academic_questions):
-        st.write(f"{i+1}. {question}")
-        response = st.text_area(f"Your response (Question {i+1}):", key=f"academic_{i}")
-        responses.append({"question_number": i+len(emotional_questions), "question_text": question, "student_response": response})
+        st.write(f"**{i + 1}. {question}**")
+        response = st.text_area(f"Your response (Question {i + 1}):", key=f"academic_{i}")
+        responses.append({"question_number": i + len(emotional_questions), "question_text": question, "student_response": response})
 
 with tab3:
     st.header("Social Integration Assessment")
     for i, question in enumerate(social_questions):
-        st.write(f"{i+1}. {question}")
-        response = st.text_area(f"Your response (Question {i+1}):", key=f"social_{i}")
-        responses.append({"question_number": i+len(emotional_questions)+len(academic_questions), "question_text": question, "student_response": response})
+        st.write(f"**{i + 1}. {question}**")
+        response = st.text_area(f"Your response (Question {i + 1}):", key=f"social_{i}")
+        responses.append({"question_number": i + len(emotional_questions) + len(academic_questions), "question_text": question, "student_response": response})
 
-if st.button("Submit Assessment"):
-    # Send responses to backend
-    backend_url = "http://localhost:5000/assess_depression"
-    response = requests.post(backend_url, json=responses)
-    
-    if response.status_code == 200:
-        result = response.json()
-        
-        # Display results in an organized manner
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.metric("Overall Depression Risk Score", f"{result['overall_depression_scale']:.2f}/10")
-            
-        with col2:
-            status_color = {
-                "High depression risk": "🔴",
-                "Moderate depression risk": "🟡",
-                "Low depression risk": "🟢"
-            }
-            st.write(f"Status: {status_color.get(result['depression_status'], '')} {result['depression_status']}")
-        
-        # Show detailed breakdown
-        st.subheader("Detailed Assessment")
-        
-        # Create three columns for different categories
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.write("**Emotional Health Indicators**")
-            for resp in result["responses"][:len(emotional_questions)]:
-                st.write(f"- Question {resp['question_number']}: {resp['depression_scale']}/10")
+# Update progress bar after all responses
+progress = calculate_progress(responses, total_questions)
+progress_bar.progress(progress / 100)
+
+# Show submit button only if all questions are answered
+all_answered = all(resp["student_response"].strip() != "" for resp in responses)
+if all_answered:
+    if st.button("Submit Assessment"):
+        with st.spinner('Analyzing your responses, please wait...'):
+            backend_url = "http://localhost:5000/assess_depression"
+            response = requests.post(backend_url, json=responses)
+
+            if response.status_code == 200:
+                result = response.json()
                 
-        with col2:
-            st.write("**Academic Performance Indicators**")
-            for resp in result["responses"][len(emotional_questions):len(emotional_questions)+len(academic_questions)]:
-                st.write(f"- Question {resp['question_number']}: {resp['depression_scale']}/10")
+                # Display results
+                col1, col2 = st.columns(2)
                 
-        with col3:
-            st.write("**Social Integration Indicators**")
-            for resp in result["responses"][len(emotional_questions)+len(academic_questions):]:
-                st.write(f"- Question {resp['question_number']}: {resp['depression_scale']}/10")
-    else:
-        st.error("Error: Unable to process your responses. Please try again later.")
+                with col1:
+                    st.metric("Overall Depression Risk Score", f"{result['overall_depression_scale']:.2f}/10")
+                    
+                with col2:
+                    status_color = {
+                        "High depression risk": "🔴",
+                        "Moderate depression risk": "🟡",
+                        "Low depression risk": "🟢"
+                    }
+                    st.write(f"Status: {status_color.get(result['depression_status'], '')} {result['depression_status']}")
+                
+                # Show detailed breakdown
+                st.subheader("Detailed Assessment")
+                
+                # Create three columns for different categories
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.write("**Emotional Health Indicators**")
+                    for resp in result["responses"][:len(emotional_questions)]:
+                        st.write(f"- Question {resp['question_number']}: {resp['depression_scale']}/10")
+                        
+                with col2:
+                    st.write("**Academic Performance Indicators**")
+                    for resp in result["responses"][len(emotional_questions):len(emotional_questions)+len(academic_questions)]:
+                        st.write(f"- Question {resp['question_number']}: {resp['depression_scale']}/10")
+                        
+                with col3:
+                    st.write("**Social Integration Indicators**")
+                    for resp in result["responses"][len(emotional_questions)+len(academic_questions):]:
+                        st.write(f"- Question {resp['question_number']}: {resp['depression_scale']}/10")
+            else:
+                st.error("Error: Unable to process your responses. Please try again later.")
+else:
+    st.warning("Please answer all questions to submit the assessment.")
