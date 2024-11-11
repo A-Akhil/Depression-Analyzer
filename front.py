@@ -19,7 +19,7 @@ student_questions = {
     "emotional": [
         "How often do you feel overwhelmed by academic pressure?",
         "How frequently do you experience difficulty sleeping?",
-        "How often do you feel lonely or isolated at school?",
+        "How often do you feel lonely or isolated at collage?",
         "How would you rate your ability to concentrate in class?",
         "How often do you feel hopeless about your academic future?"
     ],
@@ -33,7 +33,7 @@ student_questions = {
     "social": [
         "How often do you engage in extracurricular activities?",
         "How comfortable are you working in group projects?",
-        "How strong is your support system at school?",
+        "How strong is your support system at collage?",
         "How often do you interact with classmates outside of class?",
         "How well do you handle academic competition?"
     ]
